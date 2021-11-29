@@ -24,34 +24,14 @@ setwd("/users/data/projects/deep_phenotyping/storage_w_thresholds_full_trans/")
 #summary(data_bootstrap$total_transfusions_all)
 #summary(data_bootstrap$n_transfusions)
 
-
-#data_bootstrap %>% group_by(Trans_year) %>% distinct(unique_id)  %>% count()
-#n_distinct(data_bootstrap$unique_id)
-
 # load data
 data_bootstrap <- read_tsv(args[1])
-#data_bootstrap = read_tsv("/data/projects/deep_phenotyping/transfusions_bth_simple/data/processed/data_longitudinal_mortality.tsv")
-#data_bootstrap = read_tsv("/users/data/projects/deep_phenotyping/storage_w_thresholds_full_trans/data/bootstrapped_mortality/bootstrap_1.tsv")
-
 data_bootstrap <- data_bootstrap %>% arrange(unique_id,time)
-
-# Sub sample
-#data_bootstrap2$exposure <- data_bootstrap2$storage_day4
-#data_bootstrap2 <- data_bootstrap2 %>% dplyr::select(c(unique_id,time,exposure))
-#test <- data_bootstrap
-#data_bootstrap <- left_join(test,data_bootstrap2,by=c("unique_id" = "unique_id","time"="time"))
-#cpr_sub <- data_bootstrap[sample(nrow(data_bootstrap),replace = FALSE),] %>% distinct(unique_id) %>% pull()
-#data_bootstrap <- data_bootstrap[data_bootstrap$unique_id %in% cpr_sub[1:15000],]
 
 # Make patient sex binary
 data_bootstrap$patient_cpr_sex = ifelse(data_bootstrap$patient_cpr_sex == "M", 1, 0)
 
 # Define exposure
-#data_bootstrap$exposure <- data_bootstrap$storage_day4
-#data_bootstrap["exposure"] = data_bootstrap["storage_week1"]
-#data_bootstrap["exposure"] = data_bootstrap["storage_week4"]
-#data_bootstrap["exposure"] = data_bootstrap["n_transfusions"] - data_bootstrap["storage_week2"]
-#data_bootstrap$exposure <-  data_bootstrap$n_transfusions - data_bootstrap["storage_week1"]
 data_bootstrap["exposure"] <- data_bootstrap[as.character(args[2])]
 
 # Select columns to use
@@ -149,21 +129,9 @@ data_bootstrap <- data_bootstrap %>% rowwise() %>%
 #data_bootstrap <- data_bootstrap %>% mutate(pn.exposure = pmap_dbl(list(n=exposure, x = n_transfusions, y = pn.exposure), fun))
 
 data_bootstrap$sw.exposure <- data_bootstrap$pn.exposure/data_bootstrap$pd.exposure
-#summary(data_bootstrap$sw.exposure)
-#test <- data_bootstrap %>% filter(n_transfusions > 0)
-#summary(test$sw.exposure)
 
 
 # Only apply truncation once once the final weights are meassured
-
-# First weight truncation on day k
-# Weight truncation 0.01th percentile and 0.99 percentile
-#data_trans <- data_bootstrap %>% filter(n_transfusions > 0)
-#q1th <- quantile(data_trans$sw.exposure ,0.01)[[1]]
-#q99th <- quantile(data_trans$sw.exposure ,0.99)[[1]]
-#data_bootstrap <- data_bootstrap %>% mutate(sw.exposure = if_else(sw.exposure  < q1th, q1th, sw.exposure ))
-#data_bootstrap <- data_bootstrap %>% mutate(sw.exposure = if_else(sw.exposure  > q99th, q99th, sw.exposure))
-#summary(data_bootstrap$sw.exposure)
 data_bootstrap$sw.full <- data_bootstrap$sw.exposure
 #summary(data_bootstrap$sw.full)
 
@@ -173,18 +141,12 @@ data_bootstrap <- data_bootstrap %>% group_by(unique_id) %>% arrange(time,.by_gr
 #summary(data_bootstrap$sw.full)
 
 # Weight truncation on cumprod ipw
-#data_trans <- data_bootstrap %>% filter(n_transfusions > 0)
 q1th <- quantile(data_bootstrap$sw.full ,0.02)[[1]]
 q99th <- quantile(data_bootstrap$sw.full ,0.98)[[1]]
-#q1th <- quantile(data_trans$sw.full ,0.01)[[1]]
-#q99th <- quantile(data_trans$sw.full ,0.99)[[1]]
 data_bootstrap <- data_bootstrap %>% mutate(sw.full_trunc = if_else(sw.full  < q1th, q1th, sw.full ))
 data_bootstrap <- data_bootstrap %>% mutate(sw.full_trunc = if_else(sw.full  > q99th, q99th, sw.full_trunc))
 #summary(data_bootstrap$sw.full_trunc)
 rm(data_trans)
-
-#summary(data_bootstrap$sw.full_trunc)
-#summary(data_bootstrap$sw.full)
 
 
 ########################################################################################
@@ -199,17 +161,12 @@ p.denom <- glm(acute_package==0 ~
                     rcs(cos_month,3) +
                     rcspline.eval(total_transfusions,knots=c(5,20,50,150,250)) +
                     rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) +
-                    #rcspline.eval(lag1_n_transfusions,knots=c(0,1,3)) +
                     rcspline.eval(n_transfusions,knots=c(0,5,20,50,150)) +
                     as.factor(AB0_patient) +
                     as.factor(Rhesus_patient) +
                     as.factor(hospital_navn) +
                     time + I(time^2), data=data_bootstrap, family = "binomial")
 
-#p.num <- glm(acute_package==0 ~ time + I(time^2), data=data_bootstrap, family = "binomial")
-#p.num <- glm(acute_package==0 ~ time + I(time^2) + 
-#                    rcspline.eval(total_exposure,knots=c(0,1,2,4,9)) +
-#                    rcspline.eval(total_nonexposure,knots=c(0,1,2,4,9)), data=data_bootstrap, family = "binomial")
 p.num <- glm(acute_package==0 ~ time + I(time^2) + 
                     rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) +
                     rcspline.eval(total_transfusions,knots=c(5,20,50,150,250)), data=data_bootstrap, family = "binomial")
@@ -227,14 +184,6 @@ data_bootstrap <- data_bootstrap %>% mutate(pn.exposure = if_else(acute_package=
 data_bootstrap$sw.acute <- data_bootstrap$pn.exposure/data_bootstrap$pd.exposure
 #summary(data_bootstrap$sw.acute)
 
-# No weight truncation for acute package
-# This yields wrong results for the cumsum(exposure) + cumsum(nonexposure) model
-#q1th <- quantile(data_bootstrap$sw.acute ,0.01)[[1]]
-#q99th <- quantile(data_bootstrap$sw.acute ,0.99)[[1]]
-#data_bootstrap <- data_bootstrap %>% mutate(sw.acute = if_else(sw.acute  < q1th, q1th, sw.acute ))
-##data_bootstrap <- data_bootstrap %>% mutate(sw.acute = if_else(sw.acute  > q99th, q99th, sw.acute))
-#summary(data_bootstrap$sw.acute)
-
 # Cumulated product of weight up til time j per patient i
 data_bootstrap <- data_bootstrap %>% group_by(unique_id) %>% arrange(time,.by_group = TRUE) %>%
                     mutate(sw.acute = cumprod(sw.acute))
@@ -248,32 +197,6 @@ data_bootstrap <- data_bootstrap %>% mutate(sw.acute_trunc = if_else(sw.acute  >
 
 data_bootstrap$sw = data_bootstrap$sw.full_trunc * data_bootstrap$sw.acute_trunc
 
-#data_bootstrap$sw = data_bootstrap$sw.full_trunc * data_bootstrap$sw.acute
-#summary(data_bootstrap$sw)
-#summary(data_bootstrap$sw.full_trunc)
-#summary(data_bootstrap$sw.acute_trunc)
-# Model with low splines
-# ipw.model <- glm(event==0 ~ rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * time +
-#                             rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * I(time^2) +
-#                             rcspline.eval(total_transfusions_all,knots=c(0,1,2,4,9)) * time +
-#                             rcspline.eval(total_transfusions_all,knots=c(0,1,2,4,9)) * I(time^2),
-#              family=binomial(), weight = sw, data=data_bootstrap)
-
-# Model 1
-# ipw.model <- glm(event==0 ~ rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * time +
-#                             rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * I(time^2) +
-#                             rcspline.eval(total_transfusions_all,knots=c(1,3,6,12,24)) * time +
-#                             rcspline.eval(total_transfusions_all,knots=c(1,3,6,12,24)) * I(time^2),
-#              family=binomial(), weight = sw, data=data_bootstrap)
-
-# Model 2
-# ipw.model3 <- glm(event==0 ~ rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * time +
-#                              rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * I(time^2) +
-#                              rcspline.eval(total_exposure,knots=c(0,1,2,4,9)) * time +
-#                              rcspline.eval(total_exposure,knots=c(0,1,2,4,9)) * I(time^2) +
-#                              rcspline.eval(total_nonexposure,knots=c(0,1,2,4,9)) * time +
-#                              rcspline.eval(total_nonexposure,knots=c(0,1,2,4,9)) * I(time^2),
-#               family=binomial(), weight = sw, data=data_bootstrap)
 
 # Model 4
 ipw.model <- glm(event==0 ~ rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * time + 
@@ -281,14 +204,6 @@ ipw.model <- glm(event==0 ~ rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5
                             rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * I(time^2) + 
                             rcspline.eval(total_transfusions_all,knots=c(5,20,50,150,250)) * I(time^2),
              family=binomial(), weight = sw, data=data_bootstrap)
-
-
-# Numerically zero occured
-# ipw.model <- glm(event==0 ~ rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * 
-#                             rcspline.eval(total_transfusions_all,knots=c(5,20,50,150,250)) * time +
-#                             rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) * 
-#                             rcspline.eval(total_transfusions_all,knots=c(5,20,50,150,250)) * I(time^2),
-#              family=binomial(), weight = sw, data=data_bootstrap)
 
 
 

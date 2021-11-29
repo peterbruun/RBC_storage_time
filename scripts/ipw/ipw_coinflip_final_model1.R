@@ -21,34 +21,18 @@ setwd("/users/data/projects/deep_phenotyping/storage_w_thresholds_full_trans/")
 
 # Testing
 #data_bootstrap = read_tsv("/data/projects/deep_phenotyping/transfusions_bth_simple/data/processed/data_longitudinal_mortality.tsv")
-
 #data_bootstrap %>% group_by(Trans_year) %>% distinct(unique_id)  %>% count()
 #n_distinct(data_bootstrap$unique_id)
 
 # load data
 data_bootstrap <- read_tsv(args[1])
-#data_bootstrap = read_tsv("/data/projects/deep_phenotyping/transfusions_bth_simple/data/processed/data_longitudinal_mortality.tsv")
-#data_bootstrap = read_tsv("/users/data/projects/deep_phenotyping/storage_w_thresholds_full_trans/data/bootstrapped_mortality/bootstrap_1.tsv")
-
 data_bootstrap <- data_bootstrap %>% arrange(unique_id,time)
 
-# Sub sample
-#data_bootstrap2$exposure <- data_bootstrap2$storage_day4
-#data_bootstrap2 <- data_bootstrap2 %>% dplyr::select(c(unique_id,time,exposure))
-#test <- data_bootstrap
-#data_bootstrap <- left_join(test,data_bootstrap2,by=c("unique_id" = "unique_id","time"="time"))
-#cpr_sub <- data_bootstrap[sample(nrow(data_bootstrap),replace = FALSE),] %>% distinct(unique_id) %>% pull()
-#data_bootstrap <- data_bootstrap[data_bootstrap$unique_id %in% cpr_sub[1:15000],]
 
 # Make patient sex binary
 data_bootstrap$patient_cpr_sex = ifelse(data_bootstrap$patient_cpr_sex == "M", 1, 0)
 
 # Define exposure
-#data_bootstrap$exposure <- data_bootstrap$storage_day4
-#data_bootstrap["exposure"] = data_bootstrap["storage_week1"]
-#data_bootstrap["exposure"] = data_bootstrap["storage_week4"]
-#data_bootstrap["exposure"] = data_bootstrap["n_transfusions"] - data_bootstrap["storage_week2"]
-#data_bootstrap$exposure <-  data_bootstrap$n_transfusions - data_bootstrap["storage_week1"]
 data_bootstrap["exposure"] <- data_bootstrap[as.character(args[2])]
 
 # Select columns to use
@@ -91,7 +75,6 @@ data_bootstrap <- data_bootstrap %>% mutate(total_ratio_diff = total_rbc_ratio -
 # This is the probability of the number of combination of fresh and old received #
 
 data_trans <- data_bootstrap %>% filter(n_transfusions > 0)
-#rcspline.eval(data_trans$n_transfusions, nk=3, knots.only=TRUE) # None
 
 # Make part for below thresholds
 below <- uncount(data_trans, exposure)
@@ -134,7 +117,6 @@ data_bootstrap <- data_bootstrap %>%
 
 
 # Fit numerator
-#p.num <- glm(exposure_binary==1 ~ 1, data=data_trans, family = "binomial")
 p.num <- glm(exposure_binary==1 ~ rcspline.eval(total_transfusions,knots=c(0,3,5,9,14)), data=data_trans, family = "binomial")
 
 
@@ -143,26 +125,15 @@ data_bootstrap$pn.exposure <- predict(p.num, data_bootstrap, type="response")
 # Probabilty of receiving the number of fresh transfusions received using the binomial dist
 data_bootstrap <- data_bootstrap %>% rowwise() %>%
                     mutate(pn.exposure = dbinom(exposure, size=n_transfusions, prob=pn.exposure))
-#data_bootstrap <- data_bootstrap %>% mutate(pn.exposure = pmap_dbl(list(n=exposure, x = n_transfusions, y = pn.exposure), fun))
 
 data_bootstrap$sw.exposure <- data_bootstrap$pn.exposure/data_bootstrap$pd.exposure
-#summary(data_bootstrap$sw.exposure)
-#test <- data_bootstrap %>% filter(n_transfusions > 0)
-#summary(test$sw.exposure)
 
 
 # Only apply truncation once once the final weights are meassured
 
 # First weight truncation on day k
-# Weight truncation 0.01th percentile and 0.99 percentile
-#data_trans <- data_bootstrap %>% filter(n_transfusions > 0)
-#q1th <- quantile(data_trans$sw.exposure ,0.01)[[1]]
-#q99th <- quantile(data_trans$sw.exposure ,0.99)[[1]]
-#data_bootstrap <- data_bootstrap %>% mutate(sw.exposure = if_else(sw.exposure  < q1th, q1th, sw.exposure ))
-#data_bootstrap <- data_bootstrap %>% mutate(sw.exposure = if_else(sw.exposure  > q99th, q99th, sw.exposure))
-#summary(data_bootstrap$sw.exposure)
 data_bootstrap$sw.full <- data_bootstrap$sw.exposure
-#summary(data_bootstrap$sw.full)
+
 
 # time varying ipw
 data_bootstrap <- data_bootstrap %>% group_by(unique_id) %>% arrange(time,.by_group = TRUE) %>%
@@ -170,18 +141,11 @@ data_bootstrap <- data_bootstrap %>% group_by(unique_id) %>% arrange(time,.by_gr
 #summary(data_bootstrap$sw.full)
 
 # Weight truncation on cumprod ipw
-#data_trans <- data_bootstrap %>% filter(n_transfusions > 0)
 q1th <- quantile(data_bootstrap$sw.full ,0.02)[[1]]
 q99th <- quantile(data_bootstrap$sw.full ,0.98)[[1]]
-#q1th <- quantile(data_trans$sw.full ,0.01)[[1]]
-#q99th <- quantile(data_trans$sw.full ,0.99)[[1]]
 data_bootstrap <- data_bootstrap %>% mutate(sw.full_trunc = if_else(sw.full  < q1th, q1th, sw.full ))
 data_bootstrap <- data_bootstrap %>% mutate(sw.full_trunc = if_else(sw.full  > q99th, q99th, sw.full_trunc))
-#summary(data_bootstrap$sw.full_trunc)
 rm(data_trans)
-
-#summary(data_bootstrap$sw.full_trunc)
-#summary(data_bootstrap$sw.full)
 
 
 ########################################################################################
@@ -196,7 +160,6 @@ p.denom <- glm(acute_package==0 ~
                     rcs(cos_month,3) +
                     rcspline.eval(total_transfusions,knots=c(0,3,5,9,14)) +
                     rcspline.eval(total_ratio_diff,knots=c(-1,-0.5,0,0.5,1)) +
-                    #rcspline.eval(lag1_n_transfusions,knots=c(0,1,3)) +
                     rcspline.eval(n_transfusions,knots=c(0,3,5)) +
                     as.factor(AB0_patient) +
                     as.factor(Rhesus_patient) +
