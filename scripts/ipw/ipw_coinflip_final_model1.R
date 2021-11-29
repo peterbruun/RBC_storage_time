@@ -68,7 +68,6 @@ data_bootstrap <- data_bootstrap %>% mutate(total_rbc_ratio = total_exposure/tot
                                             total_rbc_ratio2 = total_nonexposure/total_transfusions_all)
 
 data_bootstrap <- data_bootstrap %>% mutate(total_ratio_diff = total_rbc_ratio - total_rbc_ratio2)
-#data_bootstrap <- data_bootstrap %>% mutate(total_exposure_diff = total_exposure - total_nonexposure)
 
 ################ PART 1 ####################
 # First part of model on patient that acutally received a transfusion #
@@ -103,7 +102,6 @@ p.denom <- glm(exposure_binary==1 ~
                     rcspline.eval(bt_difference,knots=c(0,3,5)) +
                     rcspline.eval(total_transfusions,knots=c(0,3,5,9,14)) +
                     rcspline.eval(n_transfusions,knots=c(0,3,5)) +
-                    #rcspline.eval(lag1_n_transfusions,knots=c(0,1,3)) +
                     as.factor(hospital_navn), data=data_trans, family = "binomial")
 
 

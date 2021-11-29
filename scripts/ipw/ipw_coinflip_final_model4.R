@@ -103,7 +103,6 @@ p.denom <- glm(exposure_binary==1 ~
                     rcspline.eval(bt_difference,knots=c(0,5,20,50,150)) +
                     rcspline.eval(total_transfusions,knots=c(5,20,50,150,250)) +
                     rcspline.eval(n_transfusions,knots=c(0,5,20,50,150)) +
-                    #rcspline.eval(lag1_n_transfusions,knots=c(0,1,3)) +
                     as.factor(hospital_navn), data=data_trans, family = "binomial")
 
 
@@ -117,7 +116,6 @@ data_bootstrap <- data_bootstrap %>%
 
 
 # Fit numerator
-#p.num <- glm(exposure_binary==1 ~ 1, data=data_trans, family = "binomial")
 p.num <- glm(exposure_binary==1 ~ rcspline.eval(total_transfusions,knots=c(5,20,50,150,250)), data=data_trans, family = "binomial")
 
 

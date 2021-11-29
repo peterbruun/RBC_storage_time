@@ -69,7 +69,6 @@ data_bootstrap <- data_bootstrap %>% mutate(total_rbc_ratio = total_exposure/tot
                                             total_rbc_ratio2 = total_nonexposure/total_transfusions_all)
 
 data_bootstrap <- data_bootstrap %>% mutate(total_ratio_diff = total_rbc_ratio - total_rbc_ratio2)
-#data_bootstrap <- data_bootstrap %>% mutate(total_exposure_diff = total_exposure - total_nonexposure)
 
 ################ PART 1 ####################
 # First part of model on patient that acutally received a transfusion #
@@ -118,7 +117,6 @@ data_bootstrap <- data_bootstrap %>%
 
 
 # Fit numerator
-#p.num <- glm(exposure_binary==1 ~ 1, data=data_trans, family = "binomial")
 p.num <- glm(exposure_binary==1 ~ rcspline.eval(total_transfusions,knots=c(0,5,10,20,30)), data=data_trans, family = "binomial")
 
 
@@ -171,7 +169,6 @@ p.denom <- glm(acute_package==0 ~
                     as.factor(hospital_navn) +
                     time + I(time^2), data=data_bootstrap, family = "binomial")
 
-#p.num <- glm(acute_package==0 ~ time + I(time^2), data=data_bootstrap, family = "binomial")
 p.num <- glm(acute_package==0 ~ time + I(time^2) + 
                     rcspline.eval(total_exposure,knots=c(0,5,10,20,30)) +
                     rcspline.eval(total_nonexposure,knots=c(0,5,10,20,30)) +
@@ -200,7 +197,6 @@ data_bootstrap <- data_bootstrap %>% mutate(sw.acute_trunc = if_else(sw.acute  >
 
 
 
-#data_bootstrap$sw = data_bootstrap$sw.full_trunc * data_bootstrap$sw.acute
 data_bootstrap$sw = data_bootstrap$sw.full_trunc * data_bootstrap$sw.acute_trunc
 
 
